@@ -1,9 +1,63 @@
 #include <pebble.h>
+#include "modules/weather_code_to_resource_id.h"
 
 static Window *s_main_window;
 static TextLayer *s_time_layer;
 static TextLayer *s_timestamp_layer;
 static TextLayer *s_date_layer;
+
+static TextLayer *s_temperature_layer;
+static BitmapLayer *s_icon_layer;
+static GBitmap *s_icon_bitmap = NULL;
+
+static AppSync s_sync;
+static uint8_t s_sync_buffer[64];
+
+enum WeatherKey {
+	WEATHER_ICON_KEY = 0x0,         // TUPLE_INT
+	WEATHER_TEMPERATURE_KEY = 0x1,  // TUPLE_CSTRING
+};
+
+static void sync_error_callback(DictionaryResult dict_error, AppMessageResult app_message_error, void *context) {
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync Error: %d", app_message_error);
+}
+
+
+static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
+	switch (key) {
+		case WEATHER_ICON_KEY:
+			if (s_icon_bitmap) {
+				gbitmap_destroy(s_icon_bitmap);
+			}
+
+			s_icon_bitmap = gbitmap_create_with_resource(weather_code_to_resource_id(new_tuple->value->int32));
+			bitmap_layer_set_compositing_mode(s_icon_layer, GCompOpSet);
+			bitmap_layer_set_bitmap(s_icon_layer, s_icon_bitmap);
+			break;
+
+		case WEATHER_TEMPERATURE_KEY:
+			// App Sync keeps new_tuple in s_sync_buffer, so we may use it directly
+			text_layer_set_text(s_temperature_layer, new_tuple->value->cstring);
+			break;
+	}
+}
+
+static void request_weather(void) {
+	DictionaryIterator *iter;
+	app_message_outbox_begin(&iter);
+
+	if (!iter) {
+		// Error creating outbound message
+		return;
+	}
+
+	int value = 1;
+	dict_write_int(iter, 1, &value, sizeof(int), true);
+	dict_write_end(iter);
+
+	app_message_outbox_send();
+}
+
 
 static void handle_second_tick(struct tm* tick_time, TimeUnits units_changed)
 {
@@ -30,33 +84,55 @@ static void main_window_load(Window *window)
 {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_frame(window_layer);
-	s_timestamp_layer = text_layer_create(GRect(0, 72, bounds.size.w, 34));
+	
+	s_time_layer = text_layer_create(GRect(0, 20, bounds.size.w, 28));
+	text_layer_set_text_color(s_time_layer, GColorWhite);
+	text_layer_set_background_color(s_time_layer, GColorClear);
+	text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_LECO_28_LIGHT_NUMBERS ));
+	text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
+
+	s_timestamp_layer = text_layer_create(GRect(0, 52, bounds.size.w, 20));
 	text_layer_set_text_color(s_timestamp_layer, GColorWhite);
 	text_layer_set_background_color(s_timestamp_layer, GColorClear);
 	text_layer_set_font(s_timestamp_layer, fonts_get_system_font(FONT_KEY_LECO_20_BOLD_NUMBERS));
 	text_layer_set_text_alignment(s_timestamp_layer, GTextAlignmentCenter);
 	
-	s_time_layer = text_layer_create(GRect(0, 40, bounds.size.w, 34));
-	text_layer_set_text_color(s_time_layer, GColorWhite);
-	text_layer_set_background_color(s_time_layer, GColorClear);
-	text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_LECO_28_LIGHT_NUMBERS ));
-	text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
-	
-	s_date_layer = text_layer_create(GRect(0, 108, bounds.size.w, 34));
+	s_date_layer = text_layer_create(GRect(0, 88, bounds.size.w, 14));
 	text_layer_set_text_color(s_date_layer, GColorWhite);
 	text_layer_set_background_color(s_date_layer, GColorClear);
 	text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
 	text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
-	
+
+	s_icon_layer = bitmap_layer_create(GRect(0, 102, bounds.size.w, 32));
+
+	s_temperature_layer = text_layer_create(GRect(0, 90, bounds.size.w, 32));
+	text_layer_set_text_color(s_temperature_layer, GColorWhite);
+	text_layer_set_background_color(s_temperature_layer, GColorClear);
+	text_layer_set_font(s_temperature_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+	text_layer_set_text_alignment(s_temperature_layer, GTextAlignmentCenter);
+
 	time_t now = time(NULL);
 	struct tm *current_time = localtime(&now);
 	handle_second_tick(current_time, SECOND_UNIT);
 
 	tick_timer_service_subscribe(MINUTE_UNIT, handle_second_tick);
+
+	Tuplet initial_values[] = {
+		TupletInteger(WEATHER_ICON_KEY, (uint8_t) 1),
+		TupletCString(WEATHER_TEMPERATURE_KEY, "1234\u00B0C"),
+	};
+
+	app_sync_init(&s_sync, s_sync_buffer, sizeof(s_sync_buffer),
+			initial_values, ARRAY_LENGTH(initial_values),
+			sync_tuple_changed_callback, sync_error_callback, NULL);
+
+	request_weather();
 	
 	layer_add_child(window_layer, text_layer_get_layer(s_timestamp_layer));
 	layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
 	layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
+	layer_add_child(window_layer, bitmap_layer_get_layer(s_icon_layer));
+	layer_add_child(window_layer, text_layer_get_layer(s_temperature_layer));
 }
 
 static void main_window_unload(Window *window)
@@ -90,3 +166,5 @@ int main(void)
 	app_event_loop();
 	handle_deinit();
 }
+
+/* vim: set ts=4 sw=4 sts=0 noexpandtab: */
