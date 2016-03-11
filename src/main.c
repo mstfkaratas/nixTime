@@ -67,15 +67,22 @@ static void request_weather(void) {
 }
 
 
-static void handle_second_tick(struct tm* tick_time, TimeUnits units_changed)
+static void handle_connected(bool connected) {
+	if (connected) {
+		request_weather();
+	}
+}
+
+
+static void handle_minute_tick(struct tm* tick_time, TimeUnits units_changed)
 {
+	// TODO: Y2038 problem. :-)
 	static char s_timestamp_text[] = "2147483648";
 	static char s_time_text[] = "00:00";
 	static char s_date_text[] = "9999-99-99";
-	time_t unix_time = mktime(tick_time);
+	time_t unix_time = time(NULL);
 	long long timestamp = (long long)unix_time;
-	static struct tm *local_time = NULL;
-	local_time = localtime(&unix_time);
+	struct tm *local_time = localtime(&unix_time);
 	if (clock_is_24h_style()) {
 		strftime(s_time_text, 8, "%H:%M", local_time);
 	} else {
@@ -86,6 +93,10 @@ static void handle_second_tick(struct tm* tick_time, TimeUnits units_changed)
 	text_layer_set_text(s_time_layer, s_time_text);
 	text_layer_set_text(s_timestamp_layer, s_timestamp_text);
 	text_layer_set_text(s_date_layer, s_date_text);
+
+	if (local_time->tm_min % 30 == 0) {
+		request_weather();
+	}
 }
 
 static void main_window_load(Window *window)
@@ -132,9 +143,12 @@ static void main_window_load(Window *window)
 
 	time_t now = time(NULL);
 	struct tm *current_time = localtime(&now);
-	handle_second_tick(current_time, SECOND_UNIT);
+	handle_minute_tick(current_time, SECOND_UNIT);
 
-	tick_timer_service_subscribe(MINUTE_UNIT, handle_second_tick);
+	tick_timer_service_subscribe(
+		MINUTE_UNIT | HOUR_UNIT | DAY_UNIT | MONTH_UNIT | YEAR_UNIT,
+		handle_minute_tick
+	);
 
 	Tuplet initial_values[] = {
 		TupletInteger(WEATHER_ICON_KEY, (int32_t) 1),
@@ -146,6 +160,11 @@ static void main_window_load(Window *window)
 			sync_tuple_changed_callback, sync_error_callback, NULL);
 
 	request_weather();
+
+	connection_service_subscribe((ConnectionHandlers) {
+		.pebble_app_connection_handler=handle_connected,
+		.pebblekit_connection_handler=NULL
+	});
 	
 	layer_add_child(window_layer, text_layer_get_layer(s_timestamp_layer));
 	layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
@@ -156,9 +175,17 @@ static void main_window_load(Window *window)
 
 static void main_window_unload(Window *window)
 {
+	connection_service_unsubscribe();
 	tick_timer_service_unsubscribe();
 	text_layer_destroy(s_timestamp_layer);
 	text_layer_destroy(s_time_layer);
+	text_layer_destroy(s_date_layer);
+	text_layer_destroy(s_temperature_layer);
+	bitmap_layer_destroy(s_icon_layer);
+	if (s_icon_bitmap) {
+		gbitmap_destroy(s_icon_bitmap);
+	}
+	app_sync_deinit(&s_sync);
 }
 
 void handle_init(void)

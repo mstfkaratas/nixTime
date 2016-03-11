@@ -4,6 +4,8 @@ This is a really simple Pebble watchface which displays the current time, the cu
 
 It's mostly just the tutorial code. *shrug*.
 
+The weather icons included in were purchased for the use of this project and are licensed separately -- feel free to distribute my code under the terms of the ISC license, but the weather icons are all-rights-reserved [Mike Afford Media](http://www.mikeafford.com/store/index.html).
+
 ## TODO
 
 - Configuration URL

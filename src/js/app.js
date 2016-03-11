@@ -6,7 +6,6 @@ function fetchWeather(latitude, longitude) {
   req.onload = function () {
     if (req.readyState === 4) {
       if (req.status === 200) {
-        console.log(req.responseText);
         var response = JSON.parse(req.responseText);
         var temperature = response.main.temp - 273.15;
         temperature = Math.round(temperature * 1.8 + 32);
@@ -15,10 +14,9 @@ function fetchWeather(latitude, longitude) {
           'WEATHER_ICON_KEY': weather_id,
           'WEATHER_TEMPERATURE_KEY': temperature + '\xB0F',
         };
-        console.log(JSON.stringify(msg));
         Pebble.sendAppMessage(msg);
       } else {
-        console.log('Error');
+        console.log('Error from OWM');
       }
     }
   };
@@ -43,23 +41,16 @@ var locationOptions = {
 };
 
 Pebble.addEventListener('ready', function (e) {
-  console.log('connect!' + e.ready);
   window.navigator.geolocation.getCurrentPosition(locationSuccess, locationError,
     locationOptions);
-  console.log(e.type);
 });
 
 Pebble.addEventListener('appmessage', function (e) {
   window.navigator.geolocation.getCurrentPosition(locationSuccess, locationError,
     locationOptions);
-  console.log(e.type);
-  console.log(e.payload.temperature);
-  console.log('message!');
 });
 
 Pebble.addEventListener('webviewclosed', function (e) {
   console.log('webview closed');
-  console.log(e.type);
-  console.log(e.response);
 });
 
