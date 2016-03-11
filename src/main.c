@@ -1,6 +1,8 @@
 #include <pebble.h>
 #include "modules/weather_code_to_resource_id.h"
 
+#define TEMPERATURE_FONT FONT_KEY_GOTHIC_14_BOLD
+
 static Window *s_main_window;
 static TextLayer *s_time_layer;
 static TextLayer *s_timestamp_layer;
@@ -24,13 +26,18 @@ static void sync_error_callback(DictionaryResult dict_error, AppMessageResult ap
 
 
 static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "sync_tuple_changed_callback called!");
 	switch (key) {
 		case WEATHER_ICON_KEY:
 			if (s_icon_bitmap) {
 				gbitmap_destroy(s_icon_bitmap);
 			}
 
-			s_icon_bitmap = gbitmap_create_with_resource(weather_code_to_resource_id(new_tuple->value->int32));
+			int32_t weather_id = weather_code_to_resource_id(new_tuple->value->int32);
+			if (weather_id < 0) {
+				return;
+			}
+			s_icon_bitmap = gbitmap_create_with_resource(weather_id == 0 ? RESOURCE_ID_WEATHER_UNKNOWN : weather_id);
 			bitmap_layer_set_compositing_mode(s_icon_layer, GCompOpSet);
 			bitmap_layer_set_bitmap(s_icon_layer, s_icon_bitmap);
 			break;
@@ -48,6 +55,7 @@ static void request_weather(void) {
 
 	if (!iter) {
 		// Error creating outbound message
+		APP_LOG(APP_LOG_LEVEL_ERROR, "error creating outbound message!");
 		return;
 	}
 
@@ -103,13 +111,24 @@ static void main_window_load(Window *window)
 	text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
 	text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
 
-	s_icon_layer = bitmap_layer_create(GRect(0, 102, bounds.size.w, 32));
+	GSize temp_size = graphics_text_layout_get_content_size(
+		"100\u00B0F",
+		fonts_get_system_font(TEMPERATURE_FONT),
+		GRect(0, 0, bounds.size.w, 20),
+		GTextOverflowModeFill,
+		GTextAlignmentRight
+	);
 
-	s_temperature_layer = text_layer_create(GRect(0, 90, bounds.size.w, 32));
+	int32_t left_offset = (bounds.size.w - (temp_size.w + 32)) >> 1;
+	int32_t bottom_offset = bounds.size.h - 52;
+
+	s_icon_layer = bitmap_layer_create(GRect(left_offset, bottom_offset, 32, 32));
+
+	s_temperature_layer = text_layer_create(GRect(left_offset + 32, bottom_offset + ((32 - temp_size.h) >> 1), temp_size.w, 20));
 	text_layer_set_text_color(s_temperature_layer, GColorWhite);
 	text_layer_set_background_color(s_temperature_layer, GColorClear);
-	text_layer_set_font(s_temperature_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
-	text_layer_set_text_alignment(s_temperature_layer, GTextAlignmentCenter);
+	text_layer_set_font(s_temperature_layer, fonts_get_system_font(TEMPERATURE_FONT));
+	text_layer_set_text_alignment(s_temperature_layer, GTextAlignmentRight);
 
 	time_t now = time(NULL);
 	struct tm *current_time = localtime(&now);
@@ -118,8 +137,8 @@ static void main_window_load(Window *window)
 	tick_timer_service_subscribe(MINUTE_UNIT, handle_second_tick);
 
 	Tuplet initial_values[] = {
-		TupletInteger(WEATHER_ICON_KEY, (uint8_t) 1),
-		TupletCString(WEATHER_TEMPERATURE_KEY, "1234\u00B0C"),
+		TupletInteger(WEATHER_ICON_KEY, (int32_t) 1),
+		TupletCString(WEATHER_TEMPERATURE_KEY, "   ?\u00B0F"),
 	};
 
 	app_sync_init(&s_sync, s_sync_buffer, sizeof(s_sync_buffer),
@@ -147,6 +166,8 @@ void handle_init(void)
 	s_main_window = window_create();
   
 	window_set_background_color(s_main_window, COLOR_FALLBACK(GColorOxfordBlue, GColorBlack));
+
+	app_message_open(64, 64);
 
 	window_set_window_handlers(s_main_window, (WindowHandlers) {
 		.load = main_window_load,
