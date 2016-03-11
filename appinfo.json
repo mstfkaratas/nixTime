@@ -1,0 +1,24 @@
+{
+    "appKeys": {},
+    "capabilities": [
+        ""
+    ],
+    "companyName": "roguelazer@gmail.com",
+    "enableMultiJS": true,
+    "longName": "*nixTime",
+    "projectType": "native",
+    "resources": {
+        "media": []
+    },
+    "sdkVersion": "3",
+    "shortName": "*nixTime",
+    "targetPlatforms": [
+        "basalt",
+        "chalk"
+    ],
+    "uuid": "30c0fb44-e1a0-45bd-aa45-6fc342851340",
+    "versionLabel": "1.0",
+    "watchapp": {
+        "watchface": true
+    }
+}
