@@ -1,8 +1,6 @@
 #include <pebble.h>
 #include "modules/weather_code_to_resource_id.h"
 
-#define TEMPERATURE_FONT FONT_KEY_GOTHIC_14_BOLD
-
 static Window *s_main_window;
 static TextLayer *s_time_layer;
 static TextLayer *s_timestamp_layer;
@@ -11,6 +9,11 @@ static TextLayer *s_date_layer;
 static TextLayer *s_temperature_layer;
 static BitmapLayer *s_icon_layer;
 static GBitmap *s_icon_bitmap = NULL;
+
+static GFont s_time_font;
+static GFont s_timestamp_font;
+static GFont s_date_font;
+static GFont s_temperature_font;
 
 static AppSync s_sync;
 static uint8_t s_sync_buffer[64];
@@ -77,7 +80,7 @@ static void handle_connected(bool connected) {
 static void handle_minute_tick(struct tm* tick_time, TimeUnits units_changed)
 {
 	// TODO: Y2038 problem. :-)
-	static char s_timestamp_text[] = "2147483648";
+	static char s_timestamp_text[] = "@2147483648";
 	static char s_time_text[] = "00:00";
 	static char s_date_text[] = "9999-99-99";
 	time_t unix_time = time(NULL);
@@ -89,7 +92,7 @@ static void handle_minute_tick(struct tm* tick_time, TimeUnits units_changed)
 		strftime(s_time_text, 8, "%I:%M", local_time);
 	}
 	strftime(s_date_text, 12, "%Y-%m-%d", local_time);
-	snprintf(s_timestamp_text, 10, "%lld", timestamp);
+	snprintf(s_timestamp_text, 11, "@%lld", timestamp);
 	text_layer_set_text(s_time_layer, s_time_text);
 	text_layer_set_text(s_timestamp_layer, s_timestamp_text);
 	text_layer_set_text(s_date_layer, s_date_text);
@@ -103,29 +106,65 @@ static void main_window_load(Window *window)
 {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_frame(window_layer);
-	
-	s_time_layer = text_layer_create(GRect(0, 20, bounds.size.w, 28));
+
+	s_time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
+	GSize time_size = graphics_text_layout_get_content_size(
+		"00:00",
+		s_time_font,
+		GRect(0, 0, bounds.size.w, bounds.size.h),
+		GTextOverflowModeFill,
+		GTextAlignmentCenter
+	);
+	int y_pos = 14;
+	s_time_layer = text_layer_create(GRect(0, y_pos, bounds.size.w, time_size.h));
 	text_layer_set_text_color(s_time_layer, GColorWhite);
 	text_layer_set_background_color(s_time_layer, GColorClear);
-	text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_LECO_28_LIGHT_NUMBERS ));
+	text_layer_set_font(s_time_layer, s_time_font);
 	text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
+	y_pos += time_size.h;
 
-	s_timestamp_layer = text_layer_create(GRect(0, 52, bounds.size.w, 20));
+	s_timestamp_font = fonts_load_custom_font(
+		resource_get_handle(RESOURCE_ID_PROGGY_32)
+	);
+	GSize timestamp_size = graphics_text_layout_get_content_size(
+		"1234567890",
+		s_timestamp_font,
+		GRect(0, 0, bounds.size.w, bounds.size.h),
+		GTextOverflowModeFill,
+		GTextAlignmentCenter
+	);
+	s_timestamp_layer = text_layer_create(GRect(0, y_pos, bounds.size.w, timestamp_size.h));
 	text_layer_set_text_color(s_timestamp_layer, GColorWhite);
 	text_layer_set_background_color(s_timestamp_layer, GColorClear);
-	text_layer_set_font(s_timestamp_layer, fonts_get_system_font(FONT_KEY_LECO_20_BOLD_NUMBERS));
+	text_layer_set_font(s_timestamp_layer, s_timestamp_font);
 	text_layer_set_text_alignment(s_timestamp_layer, GTextAlignmentCenter);
-	
-	s_date_layer = text_layer_create(GRect(0, 88, bounds.size.w, 14));
+	y_pos += timestamp_size.h;
+	y_pos += 4;
+
+	s_date_font = fonts_load_custom_font(
+		resource_get_handle(RESOURCE_ID_PROGGY_16)
+	);
+	GSize date_size = graphics_text_layout_get_content_size(
+		"0000-00-00",
+		s_date_font,
+		GRect(0, 0, bounds.size.w, bounds.size.h),
+		GTextOverflowModeFill,
+		GTextAlignmentCenter
+	);
+	s_date_layer = text_layer_create(GRect(0, y_pos, bounds.size.w, 24));
 	text_layer_set_text_color(s_date_layer, GColorWhite);
 	text_layer_set_background_color(s_date_layer, GColorClear);
-	text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+	text_layer_set_font(s_date_layer, s_date_font);
 	text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
+	y_pos += date_size.h;
 
+	s_temperature_font = fonts_load_custom_font(
+		resource_get_handle(RESOURCE_ID_LECO_20)
+	);
 	GSize temp_size = graphics_text_layout_get_content_size(
 		"100\u00B0F",
-		fonts_get_system_font(TEMPERATURE_FONT),
-		GRect(0, 0, bounds.size.w, 20),
+		s_temperature_font,
+		GRect(0, 0, bounds.size.w, bounds.size.h),
 		GTextOverflowModeFill,
 		GTextAlignmentRight
 	);
@@ -135,10 +174,10 @@ static void main_window_load(Window *window)
 
 	s_icon_layer = bitmap_layer_create(GRect(left_offset, bottom_offset, 32, 32));
 
-	s_temperature_layer = text_layer_create(GRect(left_offset + 32, bottom_offset + ((32 - temp_size.h) >> 1), temp_size.w, 20));
+	s_temperature_layer = text_layer_create(GRect(left_offset + 32, bottom_offset + ((28 - temp_size.h) >> 1), temp_size.w, temp_size.h));
 	text_layer_set_text_color(s_temperature_layer, GColorWhite);
 	text_layer_set_background_color(s_temperature_layer, GColorClear);
-	text_layer_set_font(s_temperature_layer, fonts_get_system_font(TEMPERATURE_FONT));
+	text_layer_set_font(s_temperature_layer, s_temperature_font);
 	text_layer_set_text_alignment(s_temperature_layer, GTextAlignmentRight);
 
 	time_t now = time(NULL);

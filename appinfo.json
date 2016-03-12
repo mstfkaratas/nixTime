@@ -18,6 +18,24 @@
         "file": "img/weather_unknown_32.png"
       },
       {
+        "type": "font",
+        "name": "PROGGY_32",
+        "file": "font/ProggyClean.ttf",
+        "characterRegex": "[@0-9]"
+      },
+      {
+        "type": "font",
+        "name": "PROGGY_16",
+        "file": "font/ProggyClean.ttf",
+        "characterRegex": "[0-9-]"
+      },
+      {
+        "type": "font",
+        "name": "LECO_20",
+        "file": "font/LECO1976-Regular.otf",
+        "characterRegex": "[0-9F\u00b0]"
+      },
+      {
         "type": "bitmap",
         "name": "WSYMBOL_0001_SUNNY",
         "file": "img/wsymbol_0001_sunny_32.png"
