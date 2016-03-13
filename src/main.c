@@ -4,6 +4,7 @@
 #define MIN_WEATHER_UPDATE_INTERVAL 1800 /* s */
 
 static Window *s_main_window;
+static Layer *s_border_layer;
 static TextLayer *s_time_layer;
 static TextLayer *s_timestamp_layer;
 static TextLayer *s_date_layer;
@@ -148,6 +149,15 @@ static void handle_minute_tick(struct tm* tick_time, TimeUnits units_changed)
 	}
 }
 
+static void draw_border_layer(Layer* l, GContext* c)
+{
+	GRect bounds = layer_get_frame(window_get_root_layer(s_main_window));
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "drawing border layer");
+	graphics_context_set_stroke_color(c, GColorPictonBlue);
+	graphics_context_set_stroke_width(c, 1);
+	graphics_draw_line(c, GPoint(0, 0), GPoint(bounds.size.w * 8, 0));
+}
+
 static void main_window_load(Window *window)
 {
 	Layer *window_layer = window_get_root_layer(window);
@@ -204,6 +214,13 @@ static void main_window_load(Window *window)
 	text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
 	y_pos += date_size.h;
 
+	int32_t bottom_offset = bounds.size.h - 52;
+	int border_y_pos = (bottom_offset + y_pos) >> 1;
+
+	s_border_layer = layer_create(GRect(10,bottom_offset, bounds.size.w - 20, 4));
+	layer_set_update_proc(s_border_layer, draw_border_layer);
+	layer_mark_dirty(s_border_layer);
+
 	s_temperature_font = fonts_load_custom_font(
 		resource_get_handle(RESOURCE_ID_LECO_20)
 	);
@@ -216,7 +233,6 @@ static void main_window_load(Window *window)
 	);
 
 	int32_t left_offset = (bounds.size.w - (temp_size.w + 32)) >> 1;
-	int32_t bottom_offset = bounds.size.h - 52;
 
 	s_icon_layer = bitmap_layer_create(GRect(left_offset, bottom_offset, 32, 32));
 
@@ -277,6 +293,7 @@ static void main_window_load(Window *window)
 	layer_add_child(window_layer, bitmap_layer_get_layer(s_icon_layer));
 	layer_add_child(window_layer, text_layer_get_layer(s_temperature_layer));
 	layer_add_child(window_layer, text_layer_get_layer(s_latlng_layer));
+	layer_add_child(window_layer, s_border_layer);
 }
 
 static void main_window_unload(Window *window)
@@ -288,6 +305,7 @@ static void main_window_unload(Window *window)
 	text_layer_destroy(s_date_layer);
 	text_layer_destroy(s_temperature_layer);
 	text_layer_destroy(s_latlng_layer);
+	layer_destroy(s_border_layer);
 	bitmap_layer_destroy(s_icon_layer);
 	if (s_icon_bitmap) {
 		gbitmap_destroy(s_icon_bitmap);
