@@ -10,10 +10,19 @@ function fetchWeather(latitude, longitude) {
         var temperature = response.main.temp - 273.15;
         temperature = Math.round(temperature * 1.8 + 32);
         var weather_id = response.weather[0].id;
+        var latlng = (Math.abs(Math.round(latitude * 10)) << 16) | (Math.abs(Math.round(longitude * 10)) & 0xffff);
+        if (latitude < 0) {
+          latlng = latlng | 0x80000000;
+        }
+        if (longitude < 0) {
+          latlng = latlng | 0x00008000;
+        }
         var msg = {
           'WEATHER_ICON_KEY': weather_id,
           'WEATHER_TEMPERATURE_KEY': temperature + '\xB0F',
+          'WEATHER_LATLNG_KEY': latlng
         };
+        console.log(JSON.stringify(msg));
         Pebble.sendAppMessage(msg);
       } else {
         console.log('Error from OWM');
@@ -31,7 +40,9 @@ function locationSuccess(pos) {
 function locationError(err) {
   console.warn('location error (' + err.code + '): ' + err.message);
   Pebble.sendAppMessage({
-    'WEATHER_TEMPERATURE_KEY': 'N/A'
+    'WEATHER_TEMPERATURE_KEY': 'N/A',
+    'WEATHER_LATITUDE_KEY': 0,
+    'WEATHER_LONGITUDE_KEY': 0
   });
 }
 

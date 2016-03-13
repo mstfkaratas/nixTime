@@ -1,10 +1,13 @@
 #include <pebble.h>
 #include "modules/weather_code_to_resource_id.h"
 
+#define MIN_WEATHER_UPDATE_INTERVAL 1800 /* s */
+
 static Window *s_main_window;
 static TextLayer *s_time_layer;
 static TextLayer *s_timestamp_layer;
 static TextLayer *s_date_layer;
+static TextLayer *s_latlng_layer;
 
 static TextLayer *s_temperature_layer;
 static BitmapLayer *s_icon_layer;
@@ -14,22 +17,37 @@ static GFont s_time_font;
 static GFont s_timestamp_font;
 static GFont s_date_font;
 static GFont s_temperature_font;
+static GFont s_latlng_font;
 
 static AppSync s_sync;
 static uint8_t s_sync_buffer[64];
 
 enum WeatherKey {
-	WEATHER_ICON_KEY = 0x0,         // TUPLE_INT
-	WEATHER_TEMPERATURE_KEY = 0x1,  // TUPLE_CSTRING
+	WEATHER_ICON_KEY = 0x0,
+	WEATHER_TEMPERATURE_KEY = 0x1,
+	WEATHER_LATLNG_KEY = 0x02,
 };
+
+static time_t weather_last_updated_time = 0;
 
 static void sync_error_callback(DictionaryResult dict_error, AppMessageResult app_message_error, void *context) {
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync Error: %d", app_message_error);
 }
 
+int abs(int x)
+{
+	if (x < 0) {
+		return -1 * x;
+	} else {
+		return x;
+	}
+}
+
 
 static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "sync_tuple_changed_callback called!");
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "sync_tuple_changed_callback called! with key %lu", key);
+	weather_last_updated_time = time(NULL);
+	static char s_latlng_text[] = "+000.0,+000.0";
 	switch (key) {
 		case WEATHER_ICON_KEY:
 			if (s_icon_bitmap) {
@@ -49,11 +67,40 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
 			// App Sync keeps new_tuple in s_sync_buffer, so we may use it directly
 			text_layer_set_text(s_temperature_layer, new_tuple->value->cstring);
 			break;
+
+		case WEATHER_LATLNG_KEY:
+			{
+				uint32_t raw = new_tuple->value->int32;
+				if (raw == 0) {
+					return;
+				}
+				int lat = raw >> 16;
+				if (lat & 0x8000) {
+					lat &= 0x7fff;
+					lat *= -1;
+				}
+				int lng = raw & 0xffff;
+				if (lng & 0x8000) {
+					lng &= 0x7fff;
+					lng *= -1;
+				}
+				int lat_base = lat / 10;
+				int lat_frac = abs(lat % 10);
+				int lng_base = lng / 10;
+				int lng_frac = abs(lng % 10);
+				snprintf(s_latlng_text, 13, "%+3d.%1d,%+3d.%1d", lat_base, lat_frac, lng_base, lng_frac);
+				text_layer_set_text(s_latlng_layer, s_latlng_text);
+			}
+			break;
 	}
 }
 
 static void request_weather(void) {
 	DictionaryIterator *iter;
+
+	if ((time(NULL) - weather_last_updated_time) < MIN_WEATHER_UPDATE_INTERVAL) {
+		return;
+	}
 	app_message_outbox_begin(&iter);
 
 	if (!iter) {
@@ -80,11 +127,10 @@ static void handle_connected(bool connected) {
 static void handle_minute_tick(struct tm* tick_time, TimeUnits units_changed)
 {
 	// TODO: Y2038 problem. :-)
-	static char s_timestamp_text[] = "@2147483648";
-	static char s_time_text[] = "00:00";
+	static char s_timestamp_text[] = "0000000000";
+	static char s_time_text[] = "00:00:00";
 	static char s_date_text[] = "9999-99-99";
 	time_t unix_time = time(NULL);
-	long long timestamp = (long long)unix_time;
 	struct tm *local_time = localtime(&unix_time);
 	if (clock_is_24h_style()) {
 		strftime(s_time_text, 8, "%H:%M", local_time);
@@ -92,7 +138,7 @@ static void handle_minute_tick(struct tm* tick_time, TimeUnits units_changed)
 		strftime(s_time_text, 8, "%I:%M", local_time);
 	}
 	strftime(s_date_text, 12, "%Y-%m-%d", local_time);
-	snprintf(s_timestamp_text, 11, "@%lld", timestamp);
+	snprintf(s_timestamp_text, 11, "%d", (int)unix_time);
 	text_layer_set_text(s_time_layer, s_time_text);
 	text_layer_set_text(s_timestamp_layer, s_timestamp_text);
 	text_layer_set_text(s_date_layer, s_date_text);
@@ -127,7 +173,7 @@ static void main_window_load(Window *window)
 		resource_get_handle(RESOURCE_ID_PROGGY_32)
 	);
 	GSize timestamp_size = graphics_text_layout_get_content_size(
-		"1234567890",
+		"2147483648",
 		s_timestamp_font,
 		GRect(0, 0, bounds.size.w, bounds.size.h),
 		GTextOverflowModeFill,
@@ -180,6 +226,25 @@ static void main_window_load(Window *window)
 	text_layer_set_font(s_temperature_layer, s_temperature_font);
 	text_layer_set_text_alignment(s_temperature_layer, GTextAlignmentRight);
 
+	y_pos = bottom_offset + 24;
+	/*s_latlng_font = fonts_load_custom_font(
+		resource_get_handle(RESOURCE_ID_PROGGY_12)
+	);*/
+	s_latlng_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
+	GSize latlng_size = graphics_text_layout_get_content_size(
+		"+000.0,+000.0",
+		s_latlng_font,
+		GRect(0, 0, bounds.size.w, bounds.size.h),
+		GTextOverflowModeFill,
+		GTextAlignmentCenter
+	);
+	s_latlng_layer = text_layer_create(GRect(0, y_pos, bounds.size.w, latlng_size.h));
+	text_layer_set_text_color(s_latlng_layer, GColorWhite);
+	text_layer_set_background_color(s_latlng_layer, GColorClear);
+	text_layer_set_font(s_latlng_layer, s_latlng_font);
+	text_layer_set_text_alignment(s_latlng_layer, GTextAlignmentCenter);
+	y_pos += latlng_size.h;
+
 	time_t now = time(NULL);
 	struct tm *current_time = localtime(&now);
 	handle_minute_tick(current_time, SECOND_UNIT);
@@ -192,6 +257,7 @@ static void main_window_load(Window *window)
 	Tuplet initial_values[] = {
 		TupletInteger(WEATHER_ICON_KEY, (int32_t) 1),
 		TupletCString(WEATHER_TEMPERATURE_KEY, "   ?\u00B0F"),
+		TupletInteger(WEATHER_LATLNG_KEY, (int32_t) 0),
 	};
 
 	app_sync_init(&s_sync, s_sync_buffer, sizeof(s_sync_buffer),
@@ -210,6 +276,7 @@ static void main_window_load(Window *window)
 	layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
 	layer_add_child(window_layer, bitmap_layer_get_layer(s_icon_layer));
 	layer_add_child(window_layer, text_layer_get_layer(s_temperature_layer));
+	layer_add_child(window_layer, text_layer_get_layer(s_latlng_layer));
 }
 
 static void main_window_unload(Window *window)
@@ -220,6 +287,7 @@ static void main_window_unload(Window *window)
 	text_layer_destroy(s_time_layer);
 	text_layer_destroy(s_date_layer);
 	text_layer_destroy(s_temperature_layer);
+	text_layer_destroy(s_latlng_layer);
 	bitmap_layer_destroy(s_icon_layer);
 	if (s_icon_bitmap) {
 		gbitmap_destroy(s_icon_bitmap);
