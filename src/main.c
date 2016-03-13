@@ -152,7 +152,6 @@ static void handle_minute_tick(struct tm* tick_time, TimeUnits units_changed)
 static void draw_border_layer(Layer* l, GContext* c)
 {
 	GRect bounds = layer_get_frame(window_get_root_layer(s_main_window));
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "drawing border layer");
 	graphics_context_set_stroke_color(c, GColorPictonBlue);
 	graphics_context_set_stroke_width(c, 1);
 	graphics_draw_line(c, GPoint(0, 0), GPoint(bounds.size.w * 8, 0));
@@ -255,7 +254,7 @@ static void main_window_load(Window *window)
 		GTextAlignmentCenter
 	);
 	s_latlng_layer = text_layer_create(GRect(0, y_pos, bounds.size.w, latlng_size.h));
-	text_layer_set_text_color(s_latlng_layer, GColorWhite);
+	text_layer_set_text_color(s_latlng_layer, GColorPictonBlue);
 	text_layer_set_background_color(s_latlng_layer, GColorClear);
 	text_layer_set_font(s_latlng_layer, s_latlng_font);
 	text_layer_set_text_alignment(s_latlng_layer, GTextAlignmentCenter);
