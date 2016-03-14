@@ -1,4 +1,7 @@
 print """
+#include <pebble.h>
+#include <stdint.h>
+
 int32_t weather_code_to_resource_id(int32_t weather_code)
 {
 	time_t now_s = time(NULL);
@@ -18,7 +21,7 @@ with open("owm-code-guide.txt", "r") as f:
             night_symbol = night_symbol.upper()
             print """
 		case {code}:
-			return is_night ? RESOURCE_ID_{day_symbol} : RESOURCE_ID_{night_symbol};
+			return is_night ? RESOURCE_ID_{night_symbol} : RESOURCE_ID_{day_symbol};
 			break;
 """.format(code=code, day_symbol=day_symbol, night_symbol=night_symbol)
 

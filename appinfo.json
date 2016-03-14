@@ -34,7 +34,7 @@
         "type": "font",
         "name": "LECO_20",
         "file": "font/LECO1976-Regular.otf",
-        "characterRegex": "[0-9F\u00b0]"
+        "characterRegex": "[0-9?CF\u00b0]"
       },
       {
         "type": "bitmap",
@@ -505,7 +505,7 @@
     "chalk"
   ],
   "uuid": "30c0fb44-e1a0-45bd-aa45-6fc342851340",
-  "versionLabel": "1.4",
+  "versionLabel": "1.5",
   "watchapp": {
     "watchface": true
   }

@@ -1,7 +1,7 @@
 #include <pebble.h>
 #include "modules/weather_code_to_resource_id.h"
 
-#define MIN_WEATHER_UPDATE_INTERVAL 1800 /* s */
+#define MIN_WEATHER_UPDATE_INTERVAL 1700 /* s */
 
 static Window *s_main_window;
 static Layer *s_border_layer;
@@ -46,7 +46,6 @@ int abs(int x)
 
 
 static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "sync_tuple_changed_callback called! with key %lu", key);
 	weather_last_updated_time = time(NULL);
 	static char s_latlng_text[] = "+000.0,+000.0";
 	switch (key) {
@@ -100,6 +99,7 @@ static void request_weather(void) {
 	DictionaryIterator *iter;
 
 	if ((time(NULL) - weather_last_updated_time) < MIN_WEATHER_UPDATE_INTERVAL) {
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "request_weather skip, last update was %d ago", (int)(time(NULL) - weather_last_updated_time));
 		return;
 	}
 	app_message_outbox_begin(&iter);
@@ -214,9 +214,8 @@ static void main_window_load(Window *window)
 	y_pos += date_size.h;
 
 	int32_t bottom_offset = bounds.size.h - 52;
-	int border_y_pos = (bottom_offset + y_pos) >> 1;
 
-	s_border_layer = layer_create(GRect(10,bottom_offset, bounds.size.w - 20, 4));
+	s_border_layer = layer_create(GRect(10, bottom_offset, bounds.size.w - 20, 4));
 	layer_set_update_proc(s_border_layer, draw_border_layer);
 	layer_mark_dirty(s_border_layer);
 
@@ -297,6 +296,7 @@ static void main_window_load(Window *window)
 
 static void main_window_unload(Window *window)
 {
+	tick_timer_service_unsubscribe();
 	connection_service_unsubscribe();
 	tick_timer_service_unsubscribe();
 	text_layer_destroy(s_timestamp_layer);
@@ -329,6 +329,7 @@ void handle_init(void)
 
 void handle_deinit(void)
 {
+	app_message_deregister_callbacks();
 	window_destroy(s_main_window);
 }
 

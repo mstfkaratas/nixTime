@@ -40,9 +40,9 @@ function locationSuccess(pos) {
 function locationError(err) {
   console.warn('location error (' + err.code + '): ' + err.message);
   Pebble.sendAppMessage({
-    'WEATHER_TEMPERATURE_KEY': 'N/A',
-    'WEATHER_LATITUDE_KEY': 0,
-    'WEATHER_LONGITUDE_KEY': 0
+    'WEATHER_TEMPERATURE_KEY': '???',
+    'WEATHER_ICON_KEY': 42,
+    'WEATHER_LATLNG_KEY': 0
   });
 }
 
