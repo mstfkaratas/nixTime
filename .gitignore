@@ -1,0 +1,4 @@
+build
+.DS_Store
+.lock-waf*
+pebble_screenshot_*
