@@ -8,6 +8,5 @@ The weather icons included in were purchased for the use of this project and are
 
 ## TODO
 
-- Configuration URL
-   - Customizable background colors
 - Sweet animations
+- Support for weather providers that are not OWM
