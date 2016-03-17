@@ -504,11 +504,12 @@
   "sdkVersion": "3",
   "shortName": "*nixTime",
   "targetPlatforms": [
+    "aplite",
     "basalt",
     "chalk"
   ],
   "uuid": "30c0fb44-e1a0-45bd-aa45-6fc342851340",
-  "versionLabel": "1.6",
+  "versionLabel": "1.7",
   "watchapp": {
     "watchface": true
   }
