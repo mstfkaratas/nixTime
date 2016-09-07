@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+	<meta http-equiv="Cache-Control" content="max-age=3600">
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<title>*nixTime Configuration</title>
+	<style type="text/css">
+html {
+	background-color: #e6e6e6;
+	color: black;
+}
+
+p {
+	padding: 1em;
+	border: 1px solid #ccc;
+	background-color: #f6f6f6;
+	color: black;
+}
+
+fieldset {
+	border: 1px solid #ccc;
+	background-color: #f6f6f6;
+}
+
+button {
+	padding: 0.5em;
+	width: 80%;
+}
+
+.centered {
+	text-align: center;
+}
+	</style>
+	<script type="text/javascript">
+	function submitValues() {
+		var color_theme = document.getElementById('color_theme');
+		var temp_unit = document.getElementById('temp_unit');
+		var update_interval = document.getElementById('update_interval');
+
+		var config = {
+			"color_theme": parseInt(color_theme.value),
+			"update_interval": parseInt(update_interval.value),
+			"temp_unit": temp_unit.value
+		};
+
+		function getQueryParam(variable, defaultValue) {
+			var query = location.search.substring(1);
+			var vars = query.split('&');
+			for (var i = 0; i < vars.length; i++) {
+				var pair = vars[i].split('=');
+				if (pair[0] === variable) {
+					return decodeURIComponent(pair[1]);
+				}
+			}
+			return defaultValue || false;
+		}
+		var return_to = getQueryParam('return_to', 'pebblejs://close#');
+
+		console.log("returning to " + return_to);
+		console.log(encodeURIComponent(JSON.stringify(config)));
+
+		document.location = return_to + encodeURIComponent(JSON.stringify(config));
+	}
+	</script>
+</head>
+<body>
+	<p>Sorry, I haven't taught this page how to use localStorage to remember
+	your saved config settings. Maybe in the next version.</p>
+	<form>
+		<fieldset>
+			<label for="color_theme">Color Theme
+			<select id="color_theme">
+				<option value="0">Bracing Blue</option>
+				<option value="1">Passionate Red</option>
+				<option value="2">Natural Green</option>
+				<option value="3">Clean Black</option>
+			</select>
+			</label><br />
+			<label for="temp_unit">Temperature Unit
+			<select id="temp_unit">
+				<option value="F">Fahrenheit</option>
+				<option value="C">Celsius</option>
+				<option value="K">Kelvin</option>
+			</select>
+		</label><br />
+			<label for="update_interval">Time Update Interval
+			<select id="update_interval">
+				<option value="0">Minute</option>
+				<option value="1">Second</option>
+			</select>
+		</label><br />
+		</fieldset>
+	</form>
+	<div class="centered">
+		<button name="submit" onclick="submitValues()">Submit</button>
+	</div>
+	<p style="font-size: 80%">Please report any bugs at <a
+		href="https://github.com/Roguelazer/nixTime/issues">https://github.com/Roguelazer/nixTime/issues</a></p>
+</body>
+</html>
