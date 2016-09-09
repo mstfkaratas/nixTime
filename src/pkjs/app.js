@@ -84,7 +84,7 @@ Pebble.addEventListener('appmessage', function (e) {
 });
 
 Pebble.addEventListener('showConfiguration', function() {
-  var url = 'https://files.roguelazer.com/nixTime/html/v1.6/config.html';
+  var url = 'https://mstfkaratas.github.io/nixTime/config.html';
 
   Pebble.openURL(url);
 });

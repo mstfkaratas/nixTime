@@ -5,6 +5,7 @@
     "name": "-nixtime",
     "pebble": {
         "capabilities": [
+            "location",
             "configurable"
         ],
         "displayName": "*nixTime",
